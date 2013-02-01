@@ -1,0 +1,156 @@
+#!/usr/bin/perl
+
+# Author: Matthias Bethke <m@towiski.de>
+# Based on a shell script by Mario Manno
+# Description: measure traffic for all xen hosts
+
+# Settings:
+# env.summing <1|0>
+#   Sum the values for all interfaces on a domain
+
+use strict;
+use warnings;
+use 5.10.0;
+
+sub domains;
+sub dom_interfaces;
+sub get_all_ifstats;
+sub get_ifstats;
+
+my $period  = $ENV{'graph_period'} // 'second';
+my $summing = $ENV{'summing'};
+
+unless(defined $ARGV[0]) {
+    my $ifstats = get_all_ifstats;
+
+    if($summing) {
+        my %dom_sums;
+
+        foreach_interface( sub {
+                my ($dom, $domtr, $idx, $if, $mac) = @_;
+                my ($upbytes, $downbytes) = get_ifstats($ifstats, $if);
+                $dom_sums{$dom} //= {};
+                $dom_sums{$dom}{up}   += $upbytes;
+                $dom_sums{$dom}{down} += $downbytes;
+            }
+        );
+        while(my ($dom, $sums) = each %dom_sums) {
+            print "${dom}Up.value $sums->{up}\n";
+            print "${dom}Down.value $sums->{down}\n";
+        }
+    } else {
+        foreach_interface( sub {
+                my ($dom, $domtr, $idx, $if, $mac) = @_;
+                my $name = "${domtr}$idx";
+                my ($upbytes, $downbytes) = get_ifstats($ifstats, $if);
+                print "${name}Up.value $upbytes\n";
+                print "${name}Down.value $downbytes\n";
+            }
+        );
+    }
+    exit 0;
+}
+
+if('autoconf' eq $ARGV[0]) {
+    if(1 != system('which xm > /dev/null') >> 8) {
+        print "no (xm not found)\n";
+        exit 1;
+    }
+
+    unless(-r '/proc/net/dev') {
+        print "no (/proc/net/dev not found)\n";
+        exit 1;
+    }
+    print "yes\n";
+    exit 0;
+}
+
+if('config' eq $ARGV[0]) {
+    print <<EOF;
+graph_title Xen Traffic
+graph_vlabel bits received (-) / sent (+) per $period
+graph_args --base 1024 -l 0
+graph_category xen
+EOF
+    if($summing) {
+        foreach my $domain (domains) {
+            print_config($domain);
+        }
+    } else {
+        foreach_interface(sub {
+                my ($dom, $domtr, $idx, $if, $mac) = @_;
+                print_config("${domtr}$idx");
+            }
+        );
+    }
+    exit 0;
+}
+
+sub print_config {
+    my $name = shift;
+
+    print <<EOF;
+${name}Down.label received
+${name}Down.type COUNTER
+${name}Down.graph no
+${name}Down.cdef ${name}Down,8,*
+${name}Up.label ${name}
+${name}Up.type COUNTER
+${name}Up.negative ${name}Down
+${name}Up.cdef ${name}Up,8,*
+EOF
+}
+
+# Gets up/down bytes for all interfaces in /proc/net/dev as a hashref
+sub get_all_ifstats {
+    open my $fh, '<', '/proc/net/dev' or die "Reading /proc/net/dev: $!";
+    <$fh>; <$fh>;   # skip two lines of header
+    return {
+        map {
+            my ($if, $nums) = /^\s*([^:]+):(.*)/;
+            $if => [ split /\s+/, $nums ];
+        } <$fh>
+    };
+};
+
+# Get stats for a single interface from prepared ifstats hash
+sub get_ifstats {
+    my ($ifstats, $if) = @_;
+    defined $ifstats->{$if} or die "Weird: $if not found in /proc/net/dev";
+    return @{$ifstats->{$if}}[0,8];
+}
+
+# Call a function once for each intergface found on all domains
+sub foreach_interface {
+    my $cb = shift;
+    foreach my $domain (domains) {
+        next if 'Domain_0' eq $domain;
+        my $domtr = $domain;
+        $domtr =~ s/[-.]/_/g;
+        foreach my $if (dom_interfaces($domain)) {
+            $cb->($domain, $domtr, @$if);
+        }
+    }
+}
+
+# Get all XEN domains via "xm list"
+sub domains {
+    open my $fh, '-|', 'xm list' or die "Running `xm list': $!";
+    return 
+        map { /^(\S+)/; $1 }
+        grep { !/ ^(?: Name | Domain-0) /x }
+        <$fh>;
+}
+
+# Get all interfaces and their MAC addresses for a domain via "xm network-list"
+sub dom_interfaces {
+    my $dom = shift;
+    open my $fh, '-|', "xm network-list $dom" or die "Running `xm network-list $dom': $!";
+    <$fh>;  # skip header
+    return map {
+        my ($idx, $be, $mac, $handle, $state, $evtch, $txring, $rxring, $dev) = split /\s+/;
+        $dev =~ s# .* vif/ (\d+) / (\d+) .* #vif$1.$2#x;
+        $mac =~ s/://g;
+        [ $idx, $dev, $mac ];
+    } <$fh>;
+}

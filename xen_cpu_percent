@@ -1,0 +1,61 @@
+#!/usr/bin/perl
+#
+# Script to monitor CPU usage of Xen domains
+#
+# Parameters understood:
+#
+#     config    (required)
+#     autoconf  (optional - used by munin-config)
+#
+use strict;
+use warnings;
+sub dom_times;
+
+unless(defined $ARGV[0]) {
+    foreach(dom_times) {
+        my ($name, $time) = @$_;
+        print "$name.value ", $time * 100, "\n";
+    }
+    exit 0;
+}
+
+if('autoconf' eq $ARGV[0]) {
+    if(1 != system('which xm > /dev/null') >> 8) {
+        print "no (xm not found)\n";
+        exit 1;
+    }
+    print "yes\n";
+    exit 0;
+}
+
+if('config' eq $ARGV[0]) {
+    print <<EOF;
+graph_title Xen Domain CPU Usage
+graph_args --base 1000 -l 0
+graph_scale no
+graph_vlabel Percentage of real CPU time
+graph_category xen
+graph_info This graph shows the average CPU percentage used by each domain
+EOF
+    foreach(dom_times) {
+        my ($name) = @$_;
+        print "$name.label $name\n";
+        print "$name.type DERIVE\n";
+        print "$name.draw ", 'Domain_0' eq $name ? 'AREA' : 'STACK', "\n";
+        print "$name.min 0\n";
+        print "$name.info Percentage of CPU usage for $name\n";
+    }
+    exit 0;
+}
+
+
+# Open a pipe from "xm list" and return lines as lists of items
+sub dom_times {
+    open my $fh, '-|', 'xm list' or die "Running `xm list': $!";
+    <$fh>;  # skip header
+    return map {
+        my ($name, $domid, $mem, $cpu, $state, $time) = split /\s+/;
+        $name =~ s/[-.]/_/g;
+        [ $name, $time ]
+    } <$fh>;
+}
