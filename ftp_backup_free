@@ -1,0 +1,57 @@
+#!/usr/bin/perl
+# Munin plugin to monitor free backup space on FTP
+#
+# Parameters:
+#     config    (required)
+#     autoconf  (optional - used by munin-config)
+#
+# Configuration:
+#     env.host  Hostname
+#     env.user  Username
+#     env.pass  Password
+#     env.size  The total size of your backup space in gibibytes (2^30 bytes)
+#
+# Requirements: lftp (http://lftp.yar.ru/)
+
+use strict;
+use warnings;
+use 5.10.0;
+
+unless(defined $ARGV[0]) {
+    defined $ENV{$_} or die foreach(qw/ host user pass size /);
+    my $usage = `echo "du" | lftp -u $ENV{user},$ENV{pass} $ENV{host}`;
+    $usage =~ s/\x09.*//g;  # cut off everything after tab
+    printf "free.value %.1f\n", $ENV{size} - $usage / 2**20;
+    exit 0;
+}
+
+if('autoconf' eq $ARGV[0]) {
+    foreach(qw/ host user pass size /) {
+        unless(defined $ENV{$_}) {
+            print "no (env.$_ not set)\n";
+            exit 0;
+        }
+    }
+    if(1 != system('which lftp > /dev/null') >> 8) {
+        print "no (lftp not found)\n";
+        exit 0;
+    }
+    print "yes\n";
+    exit 0;
+}
+
+if('config' eq $ARGV[0]) {
+    print <<EOF;
+graph_title FTP Backup Space
+graph_args --base 1024 -l 0
+graph_scale yes
+graph_vlabel Free space
+graph_category other
+graph_info This graph shows the remaining free space on FTP backup
+free.label Free Space (GiB)
+free.type GAUGE
+free.draw LINE2
+free.min 0
+EOF
+    exit 0;
+}
