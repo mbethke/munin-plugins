@@ -22,7 +22,7 @@ unless(defined $ARGV[0]) {
 if('autoconf' eq $ARGV[0]) {
     if(1 != system('which xm > /dev/null') >> 8) {
         print "no (xm not found)\n";
-        exit 1;
+        exit 0;
     }
     print "yes\n";
     exit 0;
