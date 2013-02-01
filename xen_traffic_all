@@ -70,7 +70,7 @@ if('config' eq $ARGV[0]) {
 graph_title Xen Traffic
 graph_vlabel bits received (-) / sent (+) per $period
 graph_args --base 1024 -l 0
-graph_category xen
+graph_category Vserver
 EOF
     if($summing) {
         foreach my $domain (domains) {
@@ -96,6 +96,7 @@ ${name}Down.graph no
 ${name}Down.cdef ${name}Down,8,*
 ${name}Up.label ${name}
 ${name}Up.type COUNTER
+${name}Up.draw LINE1
 ${name}Up.negative ${name}Down
 ${name}Up.cdef ${name}Up,8,*
 EOF

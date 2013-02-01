@@ -34,7 +34,7 @@ graph_title Xen Domain CPU Usage
 graph_args --base 1000 -l 0
 graph_scale no
 graph_vlabel Percentage of real CPU time
-graph_category xen
+graph_category Vserver
 graph_info This graph shows the average CPU percentage used by each domain
 EOF
     foreach(dom_times) {
