@@ -19,7 +19,7 @@ use 5.10.0;
 
 unless(defined $ARGV[0]) {
     defined $ENV{$_} or die foreach(qw/ host user pass size /);
-    my $usage = `echo "du" | lftp -u $ENV{user},$ENV{pass} $ENV{host}`;
+    my ($usage) = grep { /\x09\.$/ } `lftp -u $ENV{user},$ENV{pass} $ENV{host} -e "du;quit"`;
     $usage =~ s/\x09.*//g;  # cut off everything after tab
     printf "free.value %.1f\n", $ENV{size} - $usage / 2**20;
     exit 0;
