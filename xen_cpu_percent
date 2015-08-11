@@ -9,6 +9,7 @@
 #
 use strict;
 use warnings;
+use 5.10.0;
 sub dom_times;
 
 unless(defined $ARGV[0]) {
