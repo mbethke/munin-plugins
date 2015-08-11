@@ -12,6 +12,9 @@ use warnings;
 use 5.10.0;
 sub dom_times;
 
+my $XEN_TOOL = $ENV{toolstack} // 'xl';
+$XEN_TOOL =~ /^x[lm]$/ or warn "Dubious toolstack configured: `$XEN_TOOL'";
+
 unless(defined $ARGV[0]) {
     foreach(dom_times) {
         my ($name, $time) = @$_;
@@ -21,8 +24,8 @@ unless(defined $ARGV[0]) {
 }
 
 if('autoconf' eq $ARGV[0]) {
-    if(1 != system('which xm > /dev/null') >> 8) {
-        print "no (xm not found)\n";
+    if(1 != system("which $XEN_TOOL > /dev/null") >> 8) {
+        print "no ($XEN_TOOL not found)\n";
         exit 0;
     }
     print "yes\n";
@@ -51,9 +54,9 @@ EOF
 
 die "Unknown argument `$ARGV[0]', must be `config' or `autoconf'.\n'";
 
-# Open a pipe from "xm list" and return lines as lists of items
+# Open a pipe from "x[ml] list" and return lines as lists of items
 sub dom_times {
-    open my $fh, '-|', 'xm list' or die "Running `xm list': $!";
+    open my $fh, '-|', "$XEN_TOOL list" or die "Running `$XEN_TOOL list': $!";
     <$fh>;  # skip header
     return map {
         my ($name, $domid, $mem, $cpu, $state, $time) = split /\s+/;

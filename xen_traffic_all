@@ -19,6 +19,8 @@ sub get_ifstats;
 
 my $period  = $ENV{'graph_period'} // 'second';
 my $summing = $ENV{'summing'};
+my $XEN_TOOL = $ENV{toolstack} // 'xl';
+$XEN_TOOL =~ /^x[lm]$/ or die "Only `xm' and `xl' supported as toolstack";
 
 unless(defined $ARGV[0]) {
     my $ifstats = get_all_ifstats;
@@ -52,8 +54,8 @@ unless(defined $ARGV[0]) {
 }
 
 if('autoconf' eq $ARGV[0]) {
-    if(1 != system('which xm > /dev/null') >> 8) {
-        print "no (xm not found)\n";
+    if(1 != system("which $XEN_TOOL > /dev/null") >> 8) {
+        print "no ($XEN_TOOL not found)\n";
         exit 0;
     }
 
@@ -136,22 +138,23 @@ sub foreach_interface {
     }
 }
 
-# Get all XEN domains via "xm list"
+# Get all XEN domains via "$XEN_TOOL list"
 sub domains {
-    open my $fh, '-|', 'xm list' or die "Running `xm list': $!";
+    open my $fh, '-|', "$XEN_TOOL list" or die "Running `$XEN_TOOL list': $!";
     return 
         map { /^(\S+)/; $1 }
         grep { !/ ^(?: Name | Domain-0) /x }
         <$fh>;
 }
 
-# Get all interfaces and their MAC addresses for a domain via "xm network-list"
+# Get all interfaces and their MAC addresses for a domain via "$XEN_TOOL network-list"
 sub dom_interfaces {
     my $dom = shift;
-    open my $fh, '-|', "xm network-list $dom" or die "Running `xm network-list $dom': $!";
+    open my $fh, '-|', "$XEN_TOOL network-list $dom" or die "Running `$XEN_TOOL network-list $dom': $!";
     <$fh>;  # skip header
+    my $dev_index = $XEN_TOOL eq 'xm' ? 8 : 7;
     return map {
-        my ($idx, $be, $mac, $handle, $state, $evtch, $txring, $rxring, $dev) = split /\s+/;
+        my ($idx, $mac, $dev) = (split /\s+/)[0, 2, $dev_index];
         $dev =~ s# .* vif/ (\d+) / (\d+) .* #vif$1.$2#x;
         $mac =~ s/://g;
         [ $idx, $dev, $mac ];
