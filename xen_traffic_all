@@ -86,7 +86,7 @@ EOF
     exit 0;
 }
 
-die "Unknown argument `$ARGV[0]', must be `config' or `autoconf'.\n'"
+die "Unknown argument `$ARGV[0]', must be `config' or `autoconf'.\n'";
 
 sub print_config {
     my $name = shift;
