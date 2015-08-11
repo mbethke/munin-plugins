@@ -86,6 +86,8 @@ EOF
     exit 0;
 }
 
+die "Unknown argument `$ARGV[0]', must be `config' or `autoconf'.\n'"
+
 sub print_config {
     my $name = shift;
 
@@ -121,7 +123,7 @@ sub get_ifstats {
     return @{$ifstats->{$if}}[0,8];
 }
 
-# Call a function once for each intergface found on all domains
+# Call a function once for each interface found on all domains
 sub foreach_interface {
     my $cb = shift;
     foreach my $domain (domains) {

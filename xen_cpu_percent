@@ -48,6 +48,7 @@ EOF
     exit 0;
 }
 
+die "Unknown argument `$ARGV[0]', must be `config' or `autoconf'.\n'"
 
 # Open a pipe from "xm list" and return lines as lists of items
 sub dom_times {
